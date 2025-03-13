@@ -21,8 +21,8 @@ pipeline{
                     usernameVariable:"dockerHubUser", 
                     passwordVariable:"dockerHubPass")]){
                 sh 'echo $dockerHubPass | docker login -u $dockerHubUser --password-stdin'
-                sh "docker image tag node-app:latest ${env.dockerHubUser}/node-app:latest"
-                sh "docker push ${env.dockerHubUser}/node-app:latest"
+                sh "docker image tag node-app:latest ${env.dockerHubUser}/chandan669/simply"
+                sh "docker push ${env.dockerHubUser}/chandan669/simply"
                 }
             }
         }
