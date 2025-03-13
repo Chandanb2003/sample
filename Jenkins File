@@ -1,34 +1,51 @@
-pipeline{
+pipeline {
     agent any
     
-    stages{
-        stage("Code Clone"){
-            steps{
+    environment {
+        IMAGE_NAME = "node-app"
+        DOCKERHUB_REPO = "simply"
+    }
+    
+    stages {
+        stage("Code Clone") {
+            steps {
                 echo "Code Clone Stage"
                 git url: "https://github.com/Chandanb2003/sample.git", branch: "master"
             }
         }
-        stage("Code Build & Test"){
-            steps{
+        
+        stage("Code Build & Test") {
+            steps {
                 echo "Code Build Stage"
-                sh "docker build -t node-app ."
+                sh "docker build -t ${IMAGE_NAME} ."
             }
         }
-        stage("Push To DockerHub"){
-            steps{
+        
+        stage("Push To DockerHub") {
+            steps {
                 withCredentials([usernamePassword(
-                    credentialsId:"dockerHubCreds",
-                    usernameVariable:"dockerHubUser", 
-                    passwordVariable:"dockerHubPass")]){
-                sh 'echo $dockerHubPass | docker login -u $dockerHubUser --password-stdin'
-                sh "docker image tag node-app:latest ${env.dockerHubUser}/simply"
-                sh "docker push ${env.dockerHubUser}/simply"
+                    credentialsId: "dockerHubCreds",
+                    usernameVariable: "dockerHubUser", 
+                    passwordVariable: "dockerHubPass")]) {
+                        
+                    sh 'echo $dockerHubPass | docker login -u $dockerHubUser --password-stdin'
+                    sh "docker tag ${IMAGE_NAME}:latest $dockerHubUser/${DOCKERHUB_REPO}:latest"
+                    sh "docker push $dockerHubUser/${DOCKERHUB_REPO}:latest"
                 }
             }
         }
-        stage("Deploy"){
-            steps{
-                sh "docker compose down && docker-compose up -d --build"
+        
+        stage("Deploy") {
+            steps {
+                script {
+                    sh '''
+                    if docker compose version &>/dev/null; then
+                        docker compose down && docker compose up -d --build
+                    else
+                        docker-compose down && docker-compose up -d --build
+                    fi
+                    '''
+                }
             }
         }
     }
