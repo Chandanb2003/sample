@@ -1,11 +1,12 @@
 pipeline {
     agent any
-    
+
     environment {
         IMAGE_NAME = "node-app"
+        CONTAINER_NAME = "node-app-container"
         DOCKERHUB_REPO = "simply"
     }
-    
+
     stages {
         stage("Code Clone") {
             steps {
@@ -13,39 +14,51 @@ pipeline {
                 git url: "https://github.com/Chandanb2003/sample.git", branch: "master"
             }
         }
-        
+
         stage("Code Build & Test") {
             steps {
                 echo "Code Build Stage"
                 sh "docker build -t ${IMAGE_NAME} ."
             }
         }
-        
+
         stage("Push To DockerHub") {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: "dockerHubCreds",
-                    usernameVariable: "dockerHubUser", 
+                    usernameVariable: "dockerHubUser",
                     passwordVariable: "dockerHubPass")]) {
-                        
+
                     sh 'echo $dockerHubPass | docker login -u $dockerHubUser --password-stdin'
                     sh "docker tag ${IMAGE_NAME}:latest $dockerHubUser/${DOCKERHUB_REPO}:latest"
                     sh "docker push $dockerHubUser/${DOCKERHUB_REPO}:latest"
                 }
             }
         }
-        
+
+        stage("Delete From DockerHub") {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: "dockerHubCreds",
+                    usernameVariable: "dockerHubUser",
+                    passwordVariable: "dockerHubPass")]) {
+
+                    sh """
+                    curl -X DELETE \
+                    -u $dockerHubUser:$dockerHubPass \
+                    https://hub.docker.com/v2/repositories/$dockerHubUser/${DOCKERHUB_REPO}/tags/latest/
+                    """
+                }
+            }
+        }
+
         stage("Deploy") {
             steps {
-                script {
-                    sh '''
-                    if docker compose version &>/dev/null; then
-                        docker compose down && docker compose up -d --build
-                    else
-                        docker-compose down && docker-compose up -d --build
-                    fi
-                    '''
-                }
+                sh '''
+                docker stop ${CONTAINER_NAME} || true
+                docker rm ${CONTAINER_NAME} || true
+                docker run -d --name ${CONTAINER_NAME} -p 3000:3000 ${IMAGE_NAME}
+                '''
             }
         }
     }
